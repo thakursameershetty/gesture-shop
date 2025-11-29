@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Hand, MousePointer2, ChevronUp, ChevronDown, Trash2, Eye, RotateCcw, Lock } from 'lucide-react';
+import { motion, AnimatePresence, useSpring } from 'framer-motion';
+import { ShoppingBag, ChevronUp, ChevronDown, Trash2, RotateCcw, MousePointer2, Hand, Maximize2, X, Minus, Plus } from 'lucide-react';
 import { useHandTracking } from './useHandTracking';
 import { ProductCard } from './ProductCard';
 import { ProductDetails } from './ProductDetails';
@@ -13,48 +13,83 @@ export default function App() {
   const [draggedProduct, setDraggedProduct] = useState(null); 
   const [draggedCartItem, setDraggedCartItem] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
-
-  const { videoRef, cursor: handCursor, isGrabbing: isHandGrabbing } = useHandTracking(inputMode === 'gesture');
   
-  const [mouseCursor, setMouseCursor] = useState({ x: 0.5, y: 0.5 });
+  // UI States
+  const [isCartHovered, setIsCartHovered] = useState(false);
+  const [showCartModal, setShowCartModal] = useState(false);
+  const [magneticTarget, setMagneticTarget] = useState(null);
+  const [isPotentialDrag, setIsPotentialDrag] = useState(false);
+  
+  const { videoRef, cursorRef: handCursorRef, isGrabbing: isHandGrabbing } = useHandTracking(inputMode === 'gesture');
+  
+  const mouseCursorRef = useRef({ x: 0.5, y: 0.5 });
   const [isClicking, setIsClicking] = useState(false);
-  const [activeZone, setActiveZone] = useState(null);
-  const [bgBlur, setBgBlur] = useState(20); 
   const [clickRipple, setClickRipple] = useState(null);
-  const [autoScrollState, setAutoScrollState] = useState(null);
 
   const cartZoneRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const grabStartTime = useRef(0);
-  const lastPinchRelease = useRef(0);
   
-  const cursorRef = useRef({ x: 0.5, y: 0.5 });
   const isGrabbingRef = useRef(false);
   const draggedProductRef = useRef(null); 
-  const autoScrollRef = useRef(null); 
+  const magneticTargetRef = useRef(null);
+  const isCartHoveredRef = useRef(false);
+  const isPotentialDragRef = useRef(false);
+  const lastClickTimeRef = useRef(0); 
 
-  const activeCursor = inputMode === 'gesture' ? handCursor : mouseCursor;
   const isGrabbing = inputMode === 'gesture' ? isHandGrabbing : isClicking;
+  
+  const isMax1 = (isCartHovered || draggedProduct !== null || isPotentialDrag) && !showCartModal;
+  const isMax2 = showCartModal;
+  const isMax0 = !isMax1 && !isMax2;
+
+  const cursorX = useSpring(0, { stiffness: 600, damping: 30 });
+  const cursorY = useSpring(0, { stiffness: 600, damping: 30 });
 
   useEffect(() => {
-      cursorRef.current = activeCursor;
       isGrabbingRef.current = isGrabbing;
       draggedProductRef.current = draggedProduct || draggedCartItem;
-      autoScrollRef.current = autoScrollState;
-  }, [activeCursor, isGrabbing, draggedProduct, draggedCartItem, autoScrollState]);
+      isCartHoveredRef.current = isCartHovered;
+      isPotentialDragRef.current = isPotentialDrag;
+  }, [isGrabbing, draggedProduct, draggedCartItem, isCartHovered, isPotentialDrag]);
 
   const addToCart = (product, size = 9) => { 
     setCart(prev => {
       const newCart = [...prev];
       const existingIndex = newCart.findIndex(item => item.id === product.id && item.selectedSize === size);
       if (existingIndex >= 0) {
-        const existingItem = newCart[existingIndex];
-        newCart[existingIndex] = { ...existingItem, quantity: (existingItem.quantity || 1) + 1 };
+        // IMMUTABLE UPDATE
+        const existingItem = { ...newCart[existingIndex] };
+        existingItem.quantity = (existingItem.quantity || 1) + 1;
+        newCart[existingIndex] = existingItem;
       } else {
         newCart.push({ ...product, selectedSize: size, quantity: 1 });
       }
       return newCart;
     });
+  };
+
+  const updateQuantity = (e, index, delta) => {
+    if (e) e.stopPropagation();
+    
+    // Debounce
+    if (Date.now() - lastClickTimeRef.current < 200) return;
+    lastClickTimeRef.current = Date.now();
+
+    setCart(prev => {
+        const newCart = [...prev];
+        // IMMUTABLE UPDATE (Fixes the +2 bug)
+        const item = { ...newCart[index] }; 
+        
+        if (item.quantity + delta <= 0) {
+            newCart.splice(index, 1);
+        } else {
+            item.quantity += delta;
+            newCart[index] = item;
+        }
+        return newCart;
+    });
+    playSynthSound('click');
   };
 
   const playSynthSound = (type) => {
@@ -66,318 +101,356 @@ export default function App() {
     osc.connect(gain);
     gain.connect(ctx.destination);
     const now = ctx.currentTime;
-
-    if (type === 'grab') {
-        osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
-        gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-        osc.start(now); osc.stop(now + 0.08);
-    } else if (type === 'drop') {
-        osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
-        gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        osc.start(now); osc.stop(now + 0.1);
-    } else if (type === 'delete') {
-        osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now); osc.frequency.linearRampToValueAtTime(50, now + 0.2);
-        gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
-        osc.start(now); osc.stop(now + 0.2);
-    } else if (type === 'click') {
-        osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
-        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-        osc.start(now); osc.stop(now + 0.05);
-    } else if (type === 'lock') {
-        osc.type = 'square'; osc.frequency.setValueAtTime(200, now); osc.frequency.linearRampToValueAtTime(600, now + 0.1);
-        gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
-        osc.start(now); osc.stop(now + 0.3);
-    }
+    
+    if (type === 'grab') { osc.frequency.setValueAtTime(600, now); osc.frequency.linearRampToValueAtTime(100, now + 0.1); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.1); }
+    else if (type === 'click') { osc.frequency.setValueAtTime(1000, now); osc.frequency.linearRampToValueAtTime(600, now + 0.05); gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.05); }
+    else if (type === 'drop') { osc.frequency.setValueAtTime(300, now); osc.frequency.linearRampToValueAtTime(600, now + 0.1); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.1); }
+    
+    osc.start(now); osc.stop(now + 0.15);
   };
   
   useEffect(() => {
-    const updateMouse = (e) => setMouseCursor({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
+    const updateMouse = (e) => { mouseCursorRef.current = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight }; };
     const down = () => setIsClicking(true);
     const up = () => setIsClicking(false);
+    
     if (inputMode === 'mouse') {
-      window.addEventListener('mousemove', updateMouse);
-      window.addEventListener('mousedown', down);
-      window.addEventListener('mouseup', up);
+      window.addEventListener('mousemove', updateMouse); window.addEventListener('mousedown', down); window.addEventListener('mouseup', up);
     }
-    return () => {
-      window.removeEventListener('mousemove', updateMouse);
-      window.removeEventListener('mousedown', down);
-      window.removeEventListener('mouseup', up);
-    };
+    return () => { window.removeEventListener('mousemove', updateMouse); window.removeEventListener('mousedown', down); window.removeEventListener('mouseup', up); };
   }, [inputMode]);
 
+  const handleScroll = (direction) => {
+      if (scrollContainerRef.current) {
+          const amount = window.innerHeight * 0.4;
+          scrollContainerRef.current.scrollBy({ top: direction === 'up' ? -amount : amount, behavior: 'smooth' });
+          playSynthSound('click');
+      }
+  };
+
+  // --- RENDER LOOP ---
   useEffect(() => {
     let animationFrameId;
     const loop = () => {
-        if (scrollContainerRef.current) {
-            const y = cursorRef.current.y;
-            const grabbing = isGrabbingRef.current;
-            const draggingItem = draggedProductRef.current;
-            const autoScroll = autoScrollRef.current;
-
-            if (autoScroll) {
-                const CRUISE_SPEED = 25; 
-                if (autoScroll === 'TOP') scrollContainerRef.current.scrollTop -= CRUISE_SPEED;
-                else scrollContainerRef.current.scrollTop += CRUISE_SPEED;
-            }
-            else if (grabbing && !draggingItem && !selectedProduct) {
-                if (y < 0.15) {
-                    const intensity = (0.15 - y) / 0.15; 
-                    scrollContainerRef.current.scrollTop -= (5 + intensity * 35);
-                } else if (y > 0.85) {
-                    const intensity = (y - 0.85) / 0.15;
-                    scrollContainerRef.current.scrollTop += (5 + intensity * 35);
-                }
-            }
+        const cx = inputMode === 'gesture' ? handCursorRef.current.x : mouseCursorRef.current.x;
+        const cy = inputMode === 'gesture' ? handCursorRef.current.y : mouseCursorRef.current.y;
+        const screenX = cx * window.innerWidth;
+        const screenY = cy * window.innerHeight;
+        
+        // 1. Cursor Physics
+        if (magneticTargetRef.current) {
+             const rect = magneticTargetRef.current.getBoundingClientRect();
+             cursorX.set(rect.left + rect.width / 2);
+             cursorY.set(rect.top + rect.height / 2);
+        } else {
+             cursorX.set(screenX);
+             cursorY.set(screenY);
         }
+
+        // 2. Interaction Logic
+        // Check for magnetic targets ALL THE TIME (even if modal is open)
+        const el = document.elementFromPoint(screenX, screenY);
+        const magnet = el?.closest('.magnetic-button') || el?.closest('button');
+        
+        if (magnet !== magneticTargetRef.current) {
+            magneticTargetRef.current = magnet;
+            setMagneticTarget(magnet); 
+            if (magnet) playSynthSound('click'); 
+        }
+
+        // 3. Background Interactions (Only if Modal/Details CLOSED)
+        if (!selectedProduct && !showCartModal) {
+            // A. Potential Drag
+            const isHoveringProduct = !!el?.closest('[data-product-id]');
+            const grabbingProduct = isGrabbingRef.current && isHoveringProduct;
+            
+            if (grabbingProduct !== isPotentialDragRef.current) {
+                setIsPotentialDrag(grabbingProduct); 
+            }
+
+            // B. Hover Check
+            const cartContainer = el?.closest('.cart-container');
+            const shouldBeHovered = !!cartContainer;
+            if (shouldBeHovered !== isCartHoveredRef.current) {
+                setIsCartHovered(shouldBeHovered); 
+            }
+        } 
+
         animationFrameId = requestAnimationFrame(loop);
     };
     loop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [selectedProduct]); 
+  }, [inputMode, selectedProduct, showCartModal]);
 
-
-  // --- MAIN INTERACTION LOGIC ---
+  // --- GESTURE EVENTS ---
   useEffect(() => {
-    const x = activeCursor.x * window.innerWidth;
-    const y = activeCursor.y * window.innerHeight;
+    if (isGrabbing) {
+        if (grabStartTime.current === 0) grabStartTime.current = Date.now();
 
-    if (activeCursor.y < 0.15) setActiveZone('TOP');
-    else if (activeCursor.y > 0.85) setActiveZone('BOTTOM');
-    else setActiveZone(null);
+        const checkDragTimer = setTimeout(() => {
+             if (isGrabbingRef.current && !draggedProductRef.current && !selectedProduct && !showCartModal) {
+                 const cx = inputMode === 'gesture' ? handCursorRef.current.x : mouseCursorRef.current.x;
+                 const cy = inputMode === 'gesture' ? handCursorRef.current.y : mouseCursorRef.current.y;
+                 const el = document.elementFromPoint(cx * window.innerWidth, cy * window.innerHeight);
+                 
+                 const prodEl = el?.closest('[data-product-id]');
+                 const cartEl = el?.closest('[data-cart-index]');
+                 
+                 if (prodEl) {
+                     const p = PRODUCTS.find(x => x.id === parseInt(prodEl.getAttribute('data-product-id')));
+                     if(p) { setDraggedProduct({...p, selectedSize: 9}); playSynthSound('grab'); }
+                 } else if (cartEl) {
+                     const idx = parseInt(cartEl.getAttribute('data-cart-index'));
+                     const item = cart[idx];
+                     if (item) {
+                         const newCart = [...cart];
+                         if(item.quantity > 1) newCart[idx].quantity--; else newCart.splice(idx, 1);
+                         setCart(newCart);
+                         setDraggedCartItem({...item, quantity: 1});
+                         playSynthSound('grab');
+                     }
+                 }
+             }
+        }, 200);
+        return () => clearTimeout(checkDragTimer);
 
-    // 1. DOUBLE TAP LOGIC
-    if (!isGrabbing && grabStartTime.current > 0) {
-        const holdDuration = Date.now() - grabStartTime.current;
-        const timeSinceLastRelease = Date.now() - lastPinchRelease.current;
+    } else {
+        const duration = Date.now() - grabStartTime.current;
+        const wasClick = duration > 0 && duration < 300;
+        
+        if (wasClick && inputMode === 'gesture') {
+            const cx = handCursorRef.current.x;
+            const cy = handCursorRef.current.y;
+            const el = document.elementFromPoint(cx * window.innerWidth, cy * window.innerHeight);
+            
+            const btn = el?.closest('button');
+            const card = el?.closest('[data-product-id]');
 
-        if (holdDuration < 250) { 
-            if (timeSinceLastRelease < 300) { 
-                // === DOUBLE TAP ===
-                playSynthSound('click');
-                
-                // --- MODAL HANDLING (The Fix) ---
-                if (selectedProduct) {
-                    setClickRipple({ x, y, id: Date.now(), type: 'click' });
-                    const element = document.elementFromPoint(x, y);
-                    
-                    if (element) {
-                        // Check if we are INSIDE the white card
-                        const isInsideCard = element.closest('.product-detail-card');
-                        
-                        if (!isInsideCard) {
-                            // Clicked Background -> CLOSE
-                            setSelectedProduct(null);
-                        } else {
-                            // Clicked Inside -> Handle Buttons
-                            const clickable = element.closest('button');
-                            if (clickable) clickable.click(); 
-                        }
-                    }
-                } 
-                // --- GRID HANDLING ---
-                else {
-                    if (activeCursor.y < 0.15) {
-                        playSynthSound('lock'); setAutoScrollState('TOP'); setClickRipple({ x, y, id: Date.now(), type: 'lock' });
-                    } else if (activeCursor.y > 0.85) {
-                        playSynthSound('lock'); setAutoScrollState('BOTTOM'); setClickRipple({ x, y, id: Date.now(), type: 'lock' });
-                    } else {
-                        setClickRipple({ x, y, id: Date.now(), type: 'click' });
-                        const element = document.elementFromPoint(x, y);
-                        if (element) {
-                            const clickable = element.closest('button') || element.closest('[data-product-id]') || element;
-                            if (clickable) {
-                                if (clickable.hasAttribute('data-product-id')) {
-                                     const id = parseInt(clickable.getAttribute('data-product-id'));
-                                     const product = PRODUCTS.find(p => p.id === id);
-                                     if (product) setSelectedProduct(product);
-                                } else {
-                                    clickable.click();
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                lastPinchRelease.current = 0;
-                grabStartTime.current = 0;
-                return; 
+            // CLICK HANDLING
+            if (btn) {
+                btn.click();
+            } else if (card && !showCartModal && !selectedProduct) {
+                 const p = PRODUCTS.find(x => x.id === parseInt(card.getAttribute('data-product-id')));
+                 if (p) setSelectedProduct(p);
+            } else if (selectedProduct && !el.closest('.product-detail-card')) {
+                 setSelectedProduct(null); // Close modal if clicked outside
             }
-            lastPinchRelease.current = Date.now();
+
+            setClickRipple({ x: cx * window.innerWidth, y: cy * window.innerHeight, id: Date.now() });
+        }
+        
+        if (draggedProduct || draggedCartItem) {
+             const cx = inputMode === 'gesture' ? handCursorRef.current.x : mouseCursorRef.current.x;
+             const x = cx * window.innerWidth;
+             
+             if (draggedProduct) {
+                if (x > window.innerWidth - 300) { 
+                    addToCart(draggedProduct, draggedProduct.selectedSize);
+                    playSynthSound('drop');
+                }
+             }
+             if (draggedCartItem) {
+                 if (x < window.innerWidth - 350) { 
+                      setDraggedCartItem(null); 
+                      playSynthSound('drop');
+                 } else {
+                      addToCart(draggedCartItem, draggedCartItem.selectedSize); 
+                 }
+             }
+             setDraggedProduct(null);
+             setDraggedCartItem(null);
         }
         grabStartTime.current = 0;
     }
-
-    if (isGrabbing) {
-        if (grabStartTime.current === 0) {
-            grabStartTime.current = Date.now();
-            if (autoScrollState) {
-                playSynthSound('click'); setAutoScrollState(null); return; 
-            }
-        }
-    }
-
-    if (selectedProduct) return; 
-    if (!scrollContainerRef.current) return;
-
-    // 2. DRAG START
-    const isHolding = isGrabbing && (Date.now() - grabStartTime.current > 200);
-    
-    if (isHolding && !draggedProduct && !draggedCartItem && !autoScrollState && activeCursor.y >= 0.15 && activeCursor.y <= 0.85) {
-        const elements = document.elementsFromPoint(x, y);
-        
-        const gridElement = elements.find(el => el.getAttribute('data-product-id'));
-        if (gridElement) {
-            const id = parseInt(gridElement.getAttribute('data-product-id'));
-            const product = PRODUCTS.find(p => p.id === id);
-            if (product) {
-                playSynthSound('grab');
-                setDraggedProduct({ ...product, selectedSize: 9 });
-            }
-        }
-        
-        const cartElement = elements.find(el => el.getAttribute('data-cart-index'));
-        if (cartElement) {
-            const index = parseInt(cartElement.getAttribute('data-cart-index'));
-            const item = cart[index];
-            if (item) {
-                playSynthSound('grab');
-                const newCart = [...cart];
-                // When dragging from cart, we don't decrement yet, we just pick it up visually.
-                // Decrement logic happens when we set state.
-                if (item.quantity > 1) {
-                    newCart[index] = { ...item, quantity: item.quantity - 1 };
-                } else {
-                    newCart.splice(index, 1);
-                }
-                setCart(newCart);
-                setDraggedCartItem({ ...item, quantity: 1 });
-            }
-        }
-    }
-
-    // 3. DROP (To Cart)
-    if (!isGrabbing && draggedProduct) {
-        if (cartZoneRef.current) {
-            const rect = cartZoneRef.current.getBoundingClientRect();
-            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                playSynthSound('drop');
-                addToCart(draggedProduct, draggedProduct.selectedSize);
-            }
-        }
-        setDraggedProduct(null);
-    }
-
-    // 4. RETURN (To Shelf)
-    if (!isGrabbing && draggedCartItem) {
-        if (scrollContainerRef.current) {
-            const rect = scrollContainerRef.current.getBoundingClientRect();
-            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                playSynthSound('delete');
-                setDraggedCartItem(null); 
-                return;
-            }
-        }
-        addToCart(draggedCartItem, draggedCartItem.selectedSize);
-        setDraggedCartItem(null);
-    }
-
-  }, [isGrabbing, activeCursor, draggedProduct, draggedCartItem, cart, selectedProduct, autoScrollState]);
+  }, [isGrabbing, draggedProduct, draggedCartItem, inputMode, selectedProduct, showCartModal, cart]); 
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
-  const totalItemsCount = cart.reduce((acc, item) => acc + (item.quantity || 1), 0);
-
-  const handleAddToCartFromModal = (product, size) => {
-      playSynthSound('drop');
-      addToCart(product, size);
-  };
+  const max0Height = Math.min(80 + (cart.length * 48), 400); 
 
   return (
-    <div className="w-screen h-screen overflow-hidden relative font-sans flex flex-col md:flex-row text-gray-800 bg-transparent">
+    <div className="w-screen h-screen overflow-hidden relative font-sans flex text-gray-800 bg-transparent">
+      {/* BACKGROUND */}
       <div className={`fixed inset-0 z-[-1] bg-gray-100 transition-colors duration-500 ${inputMode === 'gesture' ? 'bg-black' : ''}`}>
-         <video ref={videoRef} autoPlay playsInline muted style={{ filter: `blur(${bgBlur}px)` }} className={`w-full h-full object-cover transform -scale-x-100 transition-opacity duration-700 ${inputMode === 'gesture' ? 'opacity-100' : 'opacity-0'}`} />
+         <video ref={videoRef} autoPlay playsInline muted style={{ filter: `blur(24px)` }} className={`w-full h-full object-cover transform -scale-x-100 transition-opacity duration-700 ${inputMode === 'gesture' ? 'opacity-100' : 'opacity-0'}`} />
       </div>
 
-      {/* GRID */}
-      <div ref={scrollContainerRef} className="w-full md:w-2/3 h-full p-6 pt-24 md:p-10 overflow-y-auto scroll-smooth no-scrollbar select-none relative">
-        <header className="hidden md:flex mb-8 justify-between items-center bg-white/80 backdrop-blur-xl p-4 rounded-[32px] shadow-sm border border-white/20">
-          <div><h1 className="text-3xl font-extrabold tracking-tight text-gray-900">New Drops</h1></div>
-          <div className="flex items-center gap-4">
-             {inputMode === 'gesture' && (<div className="flex items-center gap-2 px-4 border-r border-gray-300"><Eye size={16} className="text-gray-500" /><input type="range" min="0" max="100" value={bgBlur} onChange={(e) => setBgBlur(e.target.value)} className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" /><span className="text-xs font-mono w-10 text-right">{bgBlur}px</span></div>)}
-             <div className="flex bg-gray-100 rounded-full p-1"><button onClick={() => setInputMode('mouse')} className={`px-4 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${inputMode === 'mouse' ? 'bg-black text-white' : 'text-gray-500'}`}><MousePointer2 size={16} /> Mouse</button><button onClick={() => setInputMode('gesture')} className={`px-4 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${inputMode === 'gesture' ? 'bg-[#00e5ff] text-black' : 'text-gray-500'}`}><Hand size={16} /> Gesture AI</button></div>
-          </div>
+      {/* --- GRID --- */}
+      <div ref={scrollContainerRef} className="w-full h-full p-6 pt-24 md:p-10 md:pr-32 overflow-y-auto scroll-smooth no-scrollbar select-none relative">
+        <header className="hidden md:flex mb-8 justify-between items-center bg-white/60 backdrop-blur-md p-4 rounded-[32px] shadow-sm border border-white/40 sticky top-0 z-10">
+           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 ml-4">Gesture Shop</h1>
+           <div className="flex gap-4">
+              <button onClick={() => setInputMode('mouse')} className={`magnetic-button w-12 h-12 flex items-center justify-center rounded-full transition-all ${inputMode === 'mouse' ? 'bg-black text-white scale-110 shadow-lg' : 'bg-white/50 hover:bg-white/80'}`}><MousePointer2 size={20} /></button>
+              <button onClick={() => setInputMode('gesture')} className={`magnetic-button w-12 h-12 flex items-center justify-center rounded-full transition-all ${inputMode === 'gesture' ? 'bg-[#00e5ff] text-black scale-110 shadow-lg' : 'bg-white/50 hover:bg-white/80'}`}><Hand size={20} /></button>
+           </div>
         </header>
 
-        <div className="md:hidden fixed top-0 left-0 right-0 z-40 p-4">
-             <div className="bg-white/90 backdrop-blur-xl rounded-full px-6 py-3 shadow-lg flex justify-between items-center">
-                 <h1 className="font-bold text-lg">Gesture Shop</h1>
-                 <button onClick={() => setInputMode(m => m === 'mouse' ? 'gesture' : 'mouse')} className="bg-black text-white text-xs px-3 py-1.5 rounded-full font-bold">{inputMode === 'mouse' ? 'Switch to AI' : 'Switch to Touch'}</button>
-             </div>
-        </div>
+        <AnimatePresence>{draggedCartItem && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                <div className="bg-white/90 rounded-[32px] px-10 py-6 flex items-center gap-4 shadow-2xl scale-110 border border-white/50">
+                    <RotateCcw size={32} /> <h2 className="text-2xl font-bold">Drop to Return</h2>
+                </div>
+            </motion.div>
+        )}</AnimatePresence>
 
-        <AnimatePresence>{draggedCartItem && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 md:w-2/3 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center pointer-events-none"><div className="bg-white/90 rounded-[32px] px-8 py-4 flex items-center gap-4 shadow-2xl scale-125"><RotateCcw size={32} className="text-black" /><h2 className="text-2xl font-bold">Drop to Return</h2></div></motion.div>)}</AnimatePresence>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-48 md:pb-40">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-40">
             {PRODUCTS.map(product => {
                 const isHidden = draggedProduct?.id === product.id; 
                 return (
-                    <div key={product.id} data-product-id={product.id} onClick={() => { if(inputMode === 'mouse') setSelectedProduct(product); }} className={`transition-all duration-300 ${isHidden ? 'opacity-30 scale-95 grayscale' : 'opacity-100'}`}>
-                        <ProductCard product={product} style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)' }} />
+                    <div key={product.id} data-product-id={product.id} onClick={() => { if(inputMode === 'mouse') setSelectedProduct(product); }} className={`transition-all duration-300 ${isHidden ? 'opacity-30' : ''}`}>
+                        <ProductCard product={product} />
                     </div>
                 )
             })}
         </div>
-        
-        <div className={`fixed top-0 left-0 w-full md:w-2/3 h-32 bg-gradient-to-b from-black/10 to-transparent pointer-events-none transition-opacity duration-300 flex justify-center pt-8 md:pt-4 ${(activeZone === 'TOP' || autoScrollState === 'TOP') ? 'opacity-100' : 'opacity-0'}`}><div className={`backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold shadow-sm h-10 transition-colors ${autoScrollState === 'TOP' ? 'bg-[#00e5ff] text-black' : 'bg-white/80 animate-bounce'}`}>{autoScrollState === 'TOP' ? <><Lock size={16} /> Locked Scrolling</> : <><ChevronUp /> Double Pinch to Lock</>}</div></div>
-        <div className={`fixed bottom-0 left-0 w-full md:w-2/3 h-32 bg-gradient-to-t from-black/10 to-transparent pointer-events-none transition-opacity duration-300 flex justify-center items-end pb-32 md:pb-4 ${(activeZone === 'BOTTOM' || autoScrollState === 'BOTTOM') ? 'opacity-100' : 'opacity-0'}`}><div className={`backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold shadow-sm h-10 transition-colors ${autoScrollState === 'BOTTOM' ? 'bg-[#00e5ff] text-black' : 'bg-white/80 animate-bounce'}`}>{autoScrollState === 'BOTTOM' ? <><Lock size={16} /> Locked Scrolling</> : <><ChevronDown /> Double Pinch to Lock</>}</div></div>
       </div>
 
-      {/* CART */}
-      <div ref={cartZoneRef} className={`fixed bottom-0 left-0 right-0 h-auto max-h-[30vh] md:max-h-none md:relative md:w-1/3 md:h-full border-t md:border-t-0 md:border-l border-white/30 p-6 md:p-8 transition-all duration-300 z-30 ${draggedProduct ? 'bg-blue-50/90' : 'bg-white/60'} backdrop-blur-xl shadow-2xl`}>
-        <div className="flex items-center justify-between mb-4 md:mb-8"><h2 className="text-xl md:text-2xl font-bold flex items-center gap-3"><ShoppingBag /> Cart</h2><div className="flex gap-4"><button onClick={() => setCart([])} className="text-gray-500 hover:text-red-600 transition-colors"><Trash2 size={20}/></button><span className="bg-black text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">{totalItemsCount}</span></div></div>
-        <div className="relative w-full h-32 md:h-[500px] overflow-x-auto md:overflow-visible no-scrollbar flex md:block items-center md:mt-10 gap-4">
-            <AnimatePresence>{cart.length === 0 && !draggedCartItem && (<div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 border-2 border-dashed border-gray-400/50 rounded-[24px]"><p>Drag items here</p></div>)}
-            {cart.map((item, index) => (
-                <motion.div key={`${item.id}-${item.selectedSize}`} data-cart-index={index} initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="md:absolute md:top-0 md:left-0 md:right-0 min-w-[80px] md:min-w-0 cursor-grab active:cursor-grabbing hover:scale-105 transition-transform" style={{ zIndex: index, marginTop: window.innerWidth > 768 ? index * 60 : 0 }}>
-                        <div className="hidden md:flex bg-white/90 backdrop-blur border border-white/50 rounded-[24px] p-4 shadow-lg items-center gap-4 relative">
-                            <img src={item.image} className="w-20 h-20 rounded-xl object-cover pointer-events-none" />
-                            <div className="pointer-events-none">
-                                <h3 className="font-bold">{item.name}</h3>
-                                <div className="flex gap-2 text-sm text-gray-500"><span>${item.price}</span><span>•</span><span>US {item.selectedSize}</span></div>
-                            </div>
-                            <div className="absolute top-2 right-2 bg-black text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md">x{item.quantity}</div>
+      {/* --- SIDEBAR --- */}
+      <div className={`fixed right-6 top-0 bottom-0 h-screen flex flex-col items-center justify-center gap-4 z-50 pointer-events-none ${isMax2 ? 'hidden' : ''}`}>
+          <button onClick={() => handleScroll('up')} className="magnetic-button pointer-events-auto shrink-0 bg-white/80 backdrop-blur-md p-3 rounded-full shadow-lg border border-white/50 hover:bg-black hover:text-white transition-all transform hover:scale-110"><ChevronUp size={24} /></button>
+
+          <motion.div 
+            ref={cartZoneRef}
+            layout
+            className="cart-container pointer-events-auto relative rounded-[40px] border border-white/40 shadow-xl backdrop-blur-md overflow-hidden flex flex-col items-center"
+            animate={{ 
+                width: isMax1 ? 340 : 80, 
+                height: isMax1 ? '75vh' : max0Height, 
+                backgroundColor: isMax1 ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)'
+            }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+          >
+              <div className={`flex flex-col w-full ${isMax1 ? 'p-6 h-full' : 'py-6 items-center'}`}>
+                  
+                  {isMax0 && (
+                      <div className="flex flex-col items-center gap-3 w-full">
+                        <div className="relative p-2 shrink-0">
+                           <ShoppingBag size={28} />
+                           {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-black text-white w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold">{cart.reduce((a,b)=>a+(b.quantity||1),0)}</span>}
                         </div>
-                        <div className="md:hidden w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-sm relative"><img src={item.image} className="w-full h-full object-cover pointer-events-none" /><div className="absolute top-1 right-1 bg-black text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">x{item.quantity}</div></div>
-                </motion.div>
-            ))}</AnimatePresence>
-        </div>
-        <div className="hidden md:block absolute bottom-8 left-8 right-8"><div className="flex justify-between text-lg font-bold mb-4"><span>Total</span><span>${cartTotal}</span></div><button className="w-full bg-black text-white py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform">Checkout</button></div>
+                        <div className="flex flex-col gap-2 mt-2 w-full items-center">
+                            <AnimatePresence mode='popLayout'>
+                                {cart.map((item, i) => (
+                                    <motion.div key={`${item.id}-${item.selectedSize}`} layout initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} className="w-10 h-10 rounded-full border border-white bg-white shadow-sm overflow-hidden shrink-0">
+                                        <img src={item.image} className="w-full h-full object-cover" />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                      </div>
+                  )}
+
+                  {isMax1 && (
+                      <>
+                        <div className="flex justify-between items-center mb-6 w-full shrink-0">
+                            <button onClick={() => setCart([])} className="magnetic-button p-2 text-gray-500 hover:text-red-500"><Trash2 /></button>
+                            <h2 className="font-bold text-xl">Bag ({cart.reduce((a,b)=>a+(b.quantity||1),0)})</h2>
+                            <button 
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setIsCartHovered(false); 
+                                    setShowCartModal(true); 
+                                }} 
+                                className="magnetic-button p-2 hover:bg-black hover:text-white rounded-full transition-colors"
+                            >
+                                <Maximize2 size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto no-scrollbar w-full">
+                            <AnimatePresence mode='popLayout'>
+                                {cart.map((item, i) => (
+                                    <motion.div 
+                                        key={`${item.id}-${item.selectedSize}`}
+                                        layout
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
+                                        data-cart-index={i} 
+                                        className="mb-3 bg-white/60 p-3 rounded-[24px] flex items-center gap-3 w-full shadow-sm cursor-grab active:cursor-grabbing hover:bg-white/80 transition-colors"
+                                    >
+                                        <img src={item.image} className="w-14 h-14 rounded-xl object-cover pointer-events-none bg-white" />
+                                        <div className="flex-1 min-w-0 pointer-events-none">
+                                            <h4 className="font-bold truncate text-gray-900">{item.name}</h4>
+                                            <p className="text-sm text-gray-500 font-medium">${item.price}</p>
+                                        </div>
+                                        <div className="font-bold bg-black text-white w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-md">{item.quantity}</div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                            {cart.length === 0 && <div className="text-center text-gray-400 mt-20 font-medium">Drag items here</div>}
+                        </div>
+                        
+                        <div className="border-t border-gray-200/50 pt-4 mt-2 shrink-0 w-full">
+                            <div className="flex justify-between font-bold text-lg mb-4 px-2"><span>Total</span><span>${cartTotal}</span></div>
+                            <button className="magnetic-button w-full bg-black text-white py-4 rounded-full font-bold text-lg hover:scale-[1.02] shadow-xl transition-all">Checkout</button>
+                        </div>
+                      </>
+                  )}
+              </div>
+          </motion.div>
+
+          <button onClick={() => handleScroll('down')} className="magnetic-button pointer-events-auto shrink-0 bg-white/80 backdrop-blur-md p-3 rounded-full shadow-lg border border-white/50 hover:bg-black hover:text-white transition-all transform hover:scale-110"><ChevronDown size={24} /></button>
       </div>
 
-      {/* DRAG LAYERS */}
-      {draggedProduct && <div style={{ position: 'fixed', left: 0, top: 0, transform: `translate(${activeCursor.x * window.innerWidth}px, ${activeCursor.y * window.innerHeight}px) translate(-50%, -50%) rotate(5deg) scale(${window.innerWidth < 768 ? 0.6 : 1.1})`, pointerEvents: 'none', zIndex: 9999, transition: 'none', filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.3))' }}><ProductCard product={draggedProduct} isDragging={true} style={{ opacity: 0.9 }} /></div>}
-      {draggedCartItem && <div style={{ position: 'fixed', left: 0, top: 0, transform: `translate(${activeCursor.x * window.innerWidth}px, ${activeCursor.y * window.innerHeight}px) translate(-50%, -50%) rotate(-5deg) scale(0.9)`, pointerEvents: 'none', zIndex: 9999, transition: 'none', filter: 'drop-shadow(0px 20px 30px rgba(0,0,0,0.2))' }}><div className="relative"><ProductCard product={draggedCartItem} isDragging={true} style={{ opacity: 0.9 }} /><div className="absolute top-0 right-0 bg-black text-white font-bold w-8 h-8 rounded-full flex items-center justify-center z-[100] border-2 border-white">x1</div></div></div>}
-
-      {/* MODAL */}
+      {/* --- MAX2: MODAL --- */}
       <AnimatePresence>
-        {selectedProduct && (
-            <ProductDetails product={selectedProduct} onClose={() => setSelectedProduct(null)} onAddToCart={handleAddToCartFromModal} />
-        )}
+      {isMax2 && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-6 md:inset-12 z-[60] rounded-[32px] border border-white/40 shadow-2xl backdrop-blur-xl bg-white/95 overflow-hidden flex flex-col p-8 pointer-events-auto"
+          >
+                <div className="flex justify-between items-center mb-8 w-full shrink-0">
+                    <button onClick={() => setShowCartModal(false)} className="magnetic-button p-3 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><X size={24} /></button>
+                    <h2 className="font-bold text-3xl">Your Bag ({cart.reduce((a,b)=>a+(b.quantity||1),0)})</h2>
+                    <div className="w-12"></div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto no-scrollbar w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
+                    <AnimatePresence mode='popLayout'>
+                        {cart.map((item, i) => (
+                            <motion.div 
+                                key={`${item.id}-${item.selectedSize}`}
+                                layout
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+                                className="bg-gray-50/80 border border-gray-200 rounded-[32px] p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow"
+                            >
+                                <img src={item.image} className="w-40 h-40 rounded-2xl object-cover pointer-events-none shadow-inner mb-4" />
+                                <h4 className="font-bold text-xl text-gray-900 mb-1">{item.name}</h4>
+                                <p className="text-gray-500 font-medium mb-4">${item.price}</p>
+                                
+                                <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full px-6 py-3 shadow-sm">
+                                    <button onClick={(e) => updateQuantity(e, i, -1)} className="magnetic-button w-12 h-12 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"><Minus size={24} /></button>
+                                    <span className="font-bold text-xl w-8">{item.quantity}</span>
+                                    <button onClick={(e) => updateQuantity(e, i, 1)} className="magnetic-button w-12 h-12 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"><Plus size={24} /></button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                    {cart.length === 0 && <div className="col-span-full text-center text-gray-400 mt-20 font-medium text-2xl">Your bag is empty</div>}
+                </div>
+                
+                <div className="border-t border-gray-200 pt-6 mt-4 shrink-0 w-full flex justify-between items-center">
+                    <div className="flex gap-4 items-baseline"><span className="text-gray-500 font-medium">Total</span><span className="font-extrabold text-4xl">${cartTotal}</span></div>
+                    <button className="magnetic-button bg-black text-white py-4 px-12 rounded-full font-bold text-xl hover:scale-105 shadow-xl transition-all flex items-center gap-3">
+                        Checkout <ChevronUp className="rotate-90" />
+                    </button>
+                </div>
+          </motion.div>
+      )}
       </AnimatePresence>
 
-      {/* CURSOR & RIPPLE */}
-      {clickRipple && (<motion.div key={clickRipple.id} initial={{ width: 0, height: 0, opacity: 0.8 }} animate={{ width: 120, height: 120, opacity: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} style={{ left: clickRipple.x, top: clickRipple.y, position: 'fixed', transform: 'translate(-50%, -50%)', border: `3px solid ${clickRipple.type === 'lock' ? '#facc15' : '#00e5ff'}`, borderRadius: '50%', pointerEvents: 'none', zIndex: 99999 }} />)}
-
-      <div style={{ position: 'fixed', left: activeCursor.x * window.innerWidth, top: activeCursor.y * window.innerHeight, transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 100000 }}>
-        <div className={`w-10 h-10 rounded-full border-[3px] flex items-center justify-center shadow-[0_0_20px_currentColor,inset_0_0_10px_currentColor] transition-all duration-100 ${isGrabbing ? 'scale-125 bg-[#00e5ff]/20' : ''} ${autoScrollState ? 'border-yellow-400 text-yellow-400' : 'border-[#00e5ff] text-[#00e5ff]'}`}>
-            {autoScrollState === 'TOP' && <Lock size={16} className="animate-pulse" />}
-            {autoScrollState === 'BOTTOM' && <Lock size={16} className="animate-pulse" />}
-            {!autoScrollState && activeZone === 'TOP' && !selectedProduct && <ChevronUp size={20} className="animate-bounce" />}
-            {!autoScrollState && activeZone === 'BOTTOM' && !selectedProduct && <ChevronDown size={20} className="animate-bounce" />}
-            {!activeZone && !autoScrollState && !isGrabbing && <div className="w-1.5 h-1.5 rounded-full bg-current shadow-[0_0_5px_currentColor]" />}
-        </div>
-      </div>
-
+      {/* PREVIEWS & CURSOR */}
+      {draggedProduct && <motion.div style={{ x: cursorX, y: cursorY, position: 'fixed', left: 0, top: 0, translateX: '-50%', translateY: '-50%', rotate: 5, pointerEvents: 'none', zIndex: 9999 }}><ProductCard product={draggedProduct} isDragging={true} /></motion.div>}
+      {draggedCartItem && <motion.div style={{ x: cursorX, y: cursorY, position: 'fixed', left: 0, top: 0, translateX: '-50%', translateY: '-50%', rotate: -5, scale: 0.8, pointerEvents: 'none', zIndex: 9999 }}><ProductCard product={draggedCartItem} isDragging={true} /></motion.div>}
+      <AnimatePresence>{selectedProduct && (<ProductDetails product={selectedProduct} onClose={() => setSelectedProduct(null)} onAddToCart={(p, s) => { playSynthSound('drop'); addToCart(p, s); }} />)}</AnimatePresence>
+      <motion.div style={{ x: cursorX, y: cursorY, position: 'fixed', translateX: '-50%', translateY: '-50%', pointerEvents: 'none', zIndex: 100000 }}>
+        <div className={`rounded-full flex items-center justify-center transition-all duration-200 ${magneticTarget ? 'w-16 h-16 border-2 border-[#00e5ff] bg-[#00e5ff]/10' : 'w-8 h-8 border-2 border-[#00e5ff]'} ${isGrabbing ? 'bg-[#00e5ff]/40 scale-90' : ''}`} />
+      </motion.div>
+      {clickRipple && <motion.div key={clickRipple.id} initial={{ width: 0, opacity: 0.8 }} animate={{ width: 100, opacity: 0 }} style={{ left: clickRipple.x, top: clickRipple.y, position: 'fixed', transform: 'translate(-50%, -50%)', border: '2px solid #00e5ff', borderRadius: '50%', pointerEvents: 'none', height: 100 }} />}
     </div>
   );
 }

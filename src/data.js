@@ -5,7 +5,7 @@ export const PRODUCTS = [
     price: 156, 
     tag: "Best Seller", 
     image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=1000&auto=format&fit=crop",
-    description: "Nothing as fly, nothing as comfortable, nothing as proven. The Nike Air Max 90 stays true to its original running roots with the iconic Waffle sole, stitched overlays and classic TPU accents."
+    description: "Nothing as fly, nothing as comfortable, nothing as proven. The Nike Air Max 90 stays true to its original running roots."
   },
   { 
     id: 2, 
@@ -29,7 +29,7 @@ export const PRODUCTS = [
     price: 110, 
     tag: "Classic", 
     image: "https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?q=80&w=1000&auto=format&fit=crop",
-    description: "The radiance lives on in the Nike Air Force 1 '07, the basketball original that puts a fresh spin on what you know best: durably stitched overlays and clean finishes."
+    description: "The radiance lives on in the Nike Air Force 1 '07, the basketball original that puts a fresh spin on what you know best."
   },
   { 
     id: 5, 
@@ -37,7 +37,7 @@ export const PRODUCTS = [
     price: 180, 
     tag: "Performance", 
     image: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?q=80&w=1000&auto=format&fit=crop",
-    description: "Propel yourself forward with the Zoom Freak 4. Designed for the energy and speed of the modern game, featuring lightweight support."
+    description: "Propel yourself forward with the Zoom Freak 4. Designed for the energy and speed of the modern game."
   },
   { 
     id: 6, 
@@ -45,7 +45,7 @@ export const PRODUCTS = [
     price: 105, 
     tag: "Retro", 
     image: "https://images.unsplash.com/photo-1597045566677-8cf032ed6634?q=80&w=1000&auto=format&fit=crop",
-    description: "Styled for the '70s. Loved in the '80s. Classic in the '90s. Ready for the future. The Nike Blazer Mid delivers a timeless design that's easy to wear."
+    description: "Styled for the '70s. Loved in the '80s. Classic in the '90s. Ready for the future. The Nike Blazer Mid delivers a timeless design."
   },
   { 
     id: 7, 
@@ -53,7 +53,7 @@ export const PRODUCTS = [
     price: 220, 
     tag: "Running", 
     image: "https://images.unsplash.com/photo-1584735175315-9d5df23860e6?q=80&w=1000&auto=format&fit=crop",
-    description: "The Nike Air VaporMax Plus looks to the past to propel you into the future. With a nod to the 1998 Air Max Plus, it features a floating cage and cushioned upper."
+    description: "The Nike Air VaporMax Plus looks to the past to propel you into the future. With a nod to the 1998 Air Max Plus."
   },
   { 
     id: 8, 
@@ -69,7 +69,7 @@ export const PRODUCTS = [
     price: 200, 
     tag: "King's Choice", 
     image: "https://images.unsplash.com/photo-1605348532760-6753d2c43329?q=80&w=1000&auto=format&fit=crop",
-    description: "Two decades of a career that's exceeded every lofty expectation. The LeBron XX is the lightest edition yet, with zoom air for impact protection."
+    description: "Two decades of a career that's exceeded every lofty expectation. The LeBron XX is the lightest edition yet."
   },
   { 
     id: 10, 
@@ -77,7 +77,7 @@ export const PRODUCTS = [
     price: 130, 
     tag: "Training", 
     image: "https://images.unsplash.com/photo-1581605405669-fcdf81165afa?q=80&w=1000&auto=format&fit=crop",
-    description: "You chase the clock, challenging and encouraging each other. The Metcon 8 is built for training, with a lighter, more breathable upper."
+    description: "You chase the clock, challenging and encouraging each other. The Metcon 8 is built for training."
   },
   { 
     id: 11, 
@@ -108,7 +108,8 @@ export const PRODUCTS = [
     name: "Adidas Forum Low",
     price: 100,
     tag: "Streetwear",
-    image: "https://images.unsplash.com/photo-1587563871167-1ee9c731aef4?q=80&w=1000&auto=format&fit=crop",
+    // UPDATED
+    image: "https://assets.adidas.com/videos/w_600,f_auto,q_auto/ffac93bcfa894b698f2f71be6912c49b_d98c/Forum_Low_CL_Shoes_White_IH7830_video.jpg", 
     description: "More than just a shoe, it's a statement. The Adidas Forum hit the scene in '84 and gained major love on both the hardwood and in the music biz."
   },
   {
@@ -116,7 +117,8 @@ export const PRODUCTS = [
     name: "Converse Chuck 70",
     price: 90,
     tag: "Vintage",
-    image: "https://images.unsplash.com/photo-1607522370275-f14bc3b53138?q=80&w=1000&auto=format&fit=crop",
+    // UPDATED
+    image: "https://www.converse.in/media/catalog/product/1/6/162058c_l_107x182.jpg",
     description: "The Chuck 70 is built from that original 1970s design, with premium materials and extraordinary attention to detail."
   },
   {
@@ -125,7 +127,7 @@ export const PRODUCTS = [
     price: 75,
     tag: "Skate",
     image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=1000&auto=format&fit=crop",
-    description: "The Old Skool, the classic California skate shoe and first to bare the iconic sidestripe, is a low top lace-up with sturdy canvas and suede uppers."
+    description: "The Old Skool, the classic California skate shoe and first to bare the iconic sidestripe, is a low top lace-up."
   },
   {
     id: 17,
@@ -133,7 +135,7 @@ export const PRODUCTS = [
     price: 160,
     tag: "Running",
     image: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=1000&auto=format&fit=crop",
-    description: "Still one of our most tested shoes, designed to help you stay on the run. The React Infinity 3 has a soft, stable feel with a smooth ride."
+    description: "Still one of our most tested shoes, designed to help you stay on the run. The React Infinity 3 has a soft, stable feel."
   },
   {
     id: 18,
@@ -148,7 +150,8 @@ export const PRODUCTS = [
     name: "Asics Gel-Lyte III",
     price: 120,
     tag: "Retro Runner",
-    image: "https://images.unsplash.com/photo-1631216290369-112729647022?q=80&w=1000&auto=format&fit=crop",
+    // Fixed with generic placeholder as per previous fix
+    image: "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=1000&auto=format&fit=crop",
     description: "The GEL-LYTE III OG sneaker emerges once again with its original shape and tooling that it featured in the early 1990s."
   },
   {
@@ -157,15 +160,16 @@ export const PRODUCTS = [
     price: 85,
     tag: "Court",
     image: "https://images.unsplash.com/photo-1512374382149-233c42b6a83b?q=80&w=1000&auto=format&fit=crop",
-    description: "Join the club with a new rendition of our classic Club C kick. The soft leather upper doles out superior support and quality."
+    description: "Join the club with a new rendition of our classic Club C kick. The soft leather upper doles out superior support."
   },
   {
     id: 21,
     name: "Salomon XT-6",
     price: 200,
     tag: "Outdoor",
-    image: "https://images.unsplash.com/photo-1668089270394-7eb439903696?q=80&w=1000&auto=format&fit=crop",
-    description: "Originally launched in 2013, the XT-6 is the preferred footwear of world-class athletes for ultra-distance races under harsh conditions."
+    // Fixed with generic placeholder as per previous fix
+    image: "https://images.unsplash.com/photo-1605408499391-6368c628ef42?q=80&w=1000&auto=format&fit=crop",
+    description: "Originally launched in 2013, the XT-6 is the preferred footwear of world-class athletes for ultra-distance races."
   },
   {
     id: 22,
@@ -196,8 +200,9 @@ export const PRODUCTS = [
     name: "Nike TN Air Max",
     price: 175,
     tag: "Bold",
-    image: "https://images.unsplash.com/photo-1550399504-8953e1a672cb?q=80&w=1000&auto=format&fit=crop",
-    description: "Let your attitude have the edge in the Nike Air Max Plus, a Tuned Air experience that offers premium stability and unbelievable cushioning."
+    // UPDATED
+    image: "https://static.nike.com/a/images/t_web_pdp_936_v2/f_auto/f52752b1-4e7b-473b-8843-2583119fdde6/NIKE+AIR+MAX+PLUS+OG.png",
+    description: "Let your attitude have the edge in the Nike Air Max Plus, a Tuned Air experience that offers premium stability."
   },
   {
     id: 26,
@@ -205,7 +210,7 @@ export const PRODUCTS = [
     price: 200,
     tag: "Premium",
     image: "https://images.unsplash.com/photo-1656335362192-2bc9051b1824?q=80&w=1000&auto=format&fit=crop",
-    description: "The 990's designers were tasked with creating the single best running shoe on the market. The finished product more than lived up to its billing."
+    description: "The 990's designers were tasked with creating the single best running shoe on the market. The finished product more than lived up to it."
   },
   {
     id: 27,
@@ -221,15 +226,16 @@ export const PRODUCTS = [
     price: 125,
     tag: "High Top",
     image: "https://images.unsplash.com/photo-1524010349062-860def6649c3?q=80&w=1000&auto=format&fit=crop",
-    description: "The '80s b-ball icon returns with perfectly sheened overlays and original university colors. With its classic hoops design, the Dunk High brings vintage style."
+    description: "The '80s b-ball icon returns with perfectly sheened overlays and original university colors. With its classic hoops design."
   },
   {
     id: 29,
     name: "On Cloudmonster",
     price: 170,
     tag: "Max Cushion",
-    image: "https://images.unsplash.com/photo-1539185441755-54339c08ad6c?q=80&w=1000&auto=format&fit=crop",
-    description: "Running never felt like this. Our biggest CloudTec elements ever meet an ultra powerful Speedboard for massive cushioning and max energy."
+    // UPDATED
+    image: "https://cdn.fleetfeet.com/a:1.7777777777778-f:cover-w:1600/assets/On_Cloudmonster_2_mast.jpeg?s=c6fddba9",
+    description: "Running never felt like this. Our biggest CloudTec elements ever meet an ultra powerful Speedboard for massive cushioning."
   },
   {
     id: 30,
